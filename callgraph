@@ -1,0 +1,107 @@
+#!/bin/sh
+
+TMPDIR=/tmp
+
+if [ $# -lt 1 ]; then
+  echo "Usage: `basename $0` executable [args...]"
+  exit 1
+else
+  file=$1
+  shift
+fi
+
+TRACE=$TMPDIR/trace.gdb
+GETFUNCS=$TMPDIR/getfuncs.gdb
+
+cat > $GETFUNCS <<EOF
+set height 0
+info functions
+EOF
+
+gdb --batch --command=$GETFUNCS $file | awk '
+function get_func_name(str)
+{
+  split(str, part, "(");
+  len = split(part[1], part, " ");
+  len = split(part[len], part, "*");
+
+  return part[len];
+}
+
+BEGIN {
+  total = 0;
+  print "set width 0";
+  print "set height 0";
+  print "set verbose off";
+}
+
+/[a-zA-Z_][a-zA-Z0-9_]*\(/ {
+  fn = get_func_name($0);
+  printf("break %s\n", fn);
+  ++total;
+}
+
+END {
+  for (i = 1; i <= total; i++) {
+    print "commands", i;
+    /* print "info args"; */
+    print "backtrace 2";
+    print "continue";
+    print "end";
+  }
+
+  print "run"
+}
+' > $TRACE
+
+gdb --batch --command=$TRACE --tty=/dev/null --args $file $@ | awk '
+
+function get_callee(s)
+{
+  split(s, info, ",");
+  split(info[2], fn, " ");
+  callee = fn[1];
+
+  return callee;
+}
+
+function get_params(s, n)
+{
+  split(s, par, n);
+  split(par[2], par, " at ");
+  sub(/ \(/, "(", par[1]);
+
+  return par[1];
+}
+
+BEGIN {
+  isrecord = 0;
+  callee = "";
+  caller = "***initial***";
+  params = "";
+}
+
+/^Breakpoint [0-9]+,/ {
+  isrecord = 1;
+
+  callee = get_callee($0);
+  params = get_params($0, callee);
+}
+
+/^#1[ \t]+/ {
+  if (isrecord)
+    caller = $4;
+}
+
+/^$/ {
+  if (isrecord && (caller != "***initial***")) {
+    printf("%s %s %s\n", caller, callee, params);
+    callee = caller = params = "";
+  }
+}
+'
+
+rm -f $TRACE $GETFUNCS
+
+
+# vim: ts=2 sw=2 et ft=awk
