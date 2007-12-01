@@ -30,8 +30,8 @@ else
   shift
 fi
 
-TRACE="`mktemp -t program.XXXXXXXXXX`" || exit
-GETFUNCS="`mktemp -t program.XXXXXXXXXX`" || exit
+TRACE="`mktemp -t callgraph.XXXXXXXXXX`" || exit
+GETFUNCS="`mktemp -t callgraph.XXXXXXXXXX`" || exit
 trap 'rm -f -- "$TRACE" "$GETFUNCS"' EXIT
 trap 'trap - EXIT; rm -f -- "$TRACE" "$GETFUNCS"; exit 1' HUP INT QUIT TERM
 
