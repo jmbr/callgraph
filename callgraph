@@ -1,24 +1,46 @@
 #!/bin/sh
 
-TMPDIR=/tmp
+# Copyright (c) 2004-2007 Juan M. Bello Rivas <jmbr@superadditive.com>
+#
+# Permission is hereby granted, free of charge, to any person
+# obtaining a copy of this software and associated documentation files
+# (the "Software"), to deal in the Software without restriction,
+# including without limitation the rights to use, copy, modify, merge,
+# publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so,
+# subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+# BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+# ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
 if [ $# -lt 1 ]; then
   echo "Usage: `basename $0` executable [args...]"
   exit 1
 else
-  file=$1
+  FILE=$1
   shift
 fi
 
-TRACE=$TMPDIR/trace.gdb
-GETFUNCS=$TMPDIR/getfuncs.gdb
+TRACE="`mktemp -t program.XXXXXXXXXX`" || exit
+GETFUNCS="`mktemp -t program.XXXXXXXXXX`" || exit
+trap 'rm -f -- "$TRACE" "$GETFUNCS"' EXIT
+trap 'trap - EXIT; rm -f -- "$TRACE" "$GETFUNCS"; exit 1' HUP INT QUIT TERM
 
 cat > $GETFUNCS <<EOF
 set height 0
 info functions
 EOF
 
-gdb --batch --command=$GETFUNCS $file | awk '
+gdb --batch --command=$GETFUNCS $FILE | awk '
 function get_func_name(str)
 {
   split(str, part, "(");
@@ -54,7 +76,7 @@ END {
 }
 ' > $TRACE
 
-gdb --batch --command=$TRACE --tty=/dev/null --args $file $@ | awk '
+gdb --batch --command=$TRACE --tty=/dev/null --args $FILE $@ | awk '
 
 function get_callee(s)
 {
@@ -77,7 +99,7 @@ function get_params(s, n)
 BEGIN {
   isrecord = 0;
   callee = "";
-  caller = "***initial***";
+  caller = "*INITIAL*";
   params = "";
 }
 
@@ -94,14 +116,9 @@ BEGIN {
 }
 
 /^$/ {
-  if (isrecord && (caller != "***initial***")) {
+  if (isrecord && (caller != "*INITIAL*")) {
     printf("%s %s %s\n", caller, callee, params);
     callee = caller = params = "";
   }
 }
 '
-
-rm -f $TRACE $GETFUNCS
-
-
-# vim: ts=2 sw=2 et ft=awk
