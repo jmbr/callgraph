@@ -1,32 +1,32 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static void foo(void);
-static void bar(void);
-static void baz(void);
+static void foo(int n);
+static void bar(int n);
+static void baz(int n);
 
 int
 main(int argc, char *argv[])
 {
-	foo();
+	foo(23);
 
 	exit(EXIT_SUCCESS);
 }
 
 void 
-foo(void)
+foo(int n)
 {
-	bar();
+	bar(n);
 }
 
 void
-bar(void)
+bar(int n)
 {
-	baz();
+	baz(n);
 }
 
 void
-baz(void)
+baz(int n)
 {
 	return;
 }
